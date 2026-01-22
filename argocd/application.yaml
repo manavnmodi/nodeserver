@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nodeserver-app-application
+  # The namespace MUST be where Argo CD is installed (usually 'argocd')
+  namespace: argocd 
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/manavnmodi/nodeserver.git
+    targetRevision: main
+    # Path to your Kustomize production overlay
+    path: k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    # The namespace where your node app will actually run
+    namespace: default 
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

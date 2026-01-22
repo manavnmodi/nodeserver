@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: local-cluster-appset
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        # This selector ensures we only target clusters labeled as 'local'
+        selector:
+          matchLabels:
+            argocd.argoproj.io/secret-type: cluster
+            environment: local
+  template:
+    metadata:
+      name: '{{name}}-nodejs-app'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/manavnmodi/nodeserver.git
+        targetRevision: main
+        path: k8s/overlays/production
+      destination:
+        server: '{{server}}' # Will be https://kubernetes.default.svc for local
+        namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
