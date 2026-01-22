@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: manav23/nodeserver
+    newName: manav23/nodeserver
+    newTag: initial-tag # This line will be updated by GitHub Actions
