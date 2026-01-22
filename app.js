@@ -5,7 +5,7 @@ const VERSION = process.env.IMAGE_TAG || 'local';
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end(`Hello without webhook: ${VERSION}\n`);
+  res.end(`Hello without webhook2: ${VERSION}\n`);
 });
 
 server.listen(PORT, () => {
