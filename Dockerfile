@@ -11,5 +11,4 @@ ENV IMAGE_TAG=$IMAGE_TAG
 
 EXPOSE 8080
 
-
 CMD [ "node", "app.js" ]
