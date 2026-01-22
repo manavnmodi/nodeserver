@@ -15,5 +15,6 @@ spec:
       containers:
       - name: nodejs-container
         image: manav23/nodeserver
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
