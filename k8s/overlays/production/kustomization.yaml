@@ -5,4 +5,4 @@ resources:
 images:
 - name: manav23/nodeserver
   newName: manav23/nodeserver
-  newTag: c20947507822c52baca20c871db6c99eb051c122
+  newTag: 6300514f409ef4ca5a48d204a1148cca37883889
