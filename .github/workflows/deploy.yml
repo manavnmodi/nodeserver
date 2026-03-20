@@ -2,7 +2,7 @@ name: Build, Push and Update GitOps
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "prod" ]
 
 jobs:
   build-and-deploy:
@@ -46,43 +46,38 @@ jobs:
       #     git push
 
       # 4. Checkout Deployment Repo (prod branch)
+      # 4. Checkout SAME branch in deployment repo
       - name: Checkout Deployment Repo
         uses: actions/checkout@v4
         with:
           repository: manavnmodi/timoni-sample-app
-          ref: prod
+          ref: ${{ github.ref_name }}   # 🔥 dynamic branch
           token: ${{ secrets.DEPLOY_REPO_TOKEN }}
           path: timoni-sample-app
-          
-      # 5. Update image.cue (IMPORTANT PART)
+
+      # 5. Update image.cue
       - name: Update image.cue
         working-directory: timoni-sample-app
         run: |
+          echo "Branch: ${{ github.ref_name }}"
           echo "Updating image.cue..."
 
-          # Update repository
-          sed -i 's|repository: ".*"|repository: "manav23/nodeserver"|' image.cue
-
-          # Update tag
-          sed -i 's|tag: ".*"|tag: "${{ github.sha }}"|' image.cue
+          # sed -i 's|repository: ".*"|repository: "manav23/nodeserver"|' image.cue
+          sed -i "s|tag: \"[^\"]*\"|tag: \"${{ github.sha }}\"|" image.cue
 
           echo "Updated file:"
           cat image.cue
 
-      # 6. Create Pull Request
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
-          path: timoni-sample-app  
-          branch: bot/update-image-${{ github.sha }}
-          base: prod
-          commit-message: "chore: update image to ${{ github.sha }}"
-          title: "chore: update image to ${{ github.sha }}"
-          body: |
-            🚀 Automated PR
-        
-            Updated image:
-            manav23/nodeserver:${{ github.sha }}
+      # 6. Commit and Push (DIRECT)
+      - name: Commit and Push Changes
+        working-directory: timoni-sample-app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          git add image.cue
+
+          git commit -m "chore: update image to ${{ github.sha }}" || echo "No changes to commit"
+
+          git push origin ${{ github.ref_name }}
           
