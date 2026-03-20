@@ -2,26 +2,29 @@ name: Build, Push and Update GitOps
 
 on:
   push:
-    branches: [ "prod" ]
+    branches: ["prod"]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to push the tag update back to the repo
+      contents: write
 
     steps:
+      # 1. Checkout source repo
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 2. Login to DockerHub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
+      # 3. Build and Push Image
       - name: Build and Push Image
-        id: build   # 👈 IMPORTANT
+        id: build   # ✅ REQUIRED for digest
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -46,9 +49,17 @@ jobs:
       #     # [skip ci] prevents the workflow from triggering itself in a loop
       #     git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
       #     git push
+      # 4. Extract Digest 
+      - name: Extract Digest
+        run: |
+          echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
-      # 4. Checkout Deployment Repo (prod branch)
-      # 4. Checkout SAME branch in deployment repo
+      # 5. Debug Digest (optional but recommended)
+      - name: Debug Digest
+        run: |
+          echo "Digest is: $DIGEST"
+
+      # 6. Checkout Deployment Repo
       - name: Checkout Deployment Repo
         uses: actions/checkout@v4
         with:
@@ -57,22 +68,25 @@ jobs:
           token: ${{ secrets.DEPLOY_REPO_TOKEN }}
           path: timoni-sample-app
 
-      # 5. Update image.cue
+      # 7. Update image.cue
       - name: Update image.cue
         working-directory: timoni-sample-app
         run: |
           echo "Updating image.cue..."
-      
-          # Always keep latest tag
-          sed -i 's|tag:.*|tag: "latest"|' image.cue
-      
-          # Update digest (IMPORTANT)
-          sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" image.cue
-      
-          echo "Updated file:"
+
+          echo "Before:"
           cat image.cue
 
-      # 6. Commit and Push (DIRECT)
+          # Ensure tag is always latest
+          sed -i 's|tag:.*|tag: "latest"|' image.cue
+
+          # Update digest 
+          sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" image.cue
+
+          echo "After:"
+          cat image.cue
+
+      # 8. Commit and Push
       - name: Commit and Push Changes
         working-directory: timoni-sample-app
         run: |
@@ -81,7 +95,9 @@ jobs:
 
           git add image.cue
 
-          git commit -m "chore: update image to ${{ github.sha }}" || echo "No changes to commit"
+          git diff --quiet && echo "No changes detected" && exit 0
 
+          git commit -m "chore: update image digest to ${DIGEST}"
+          
           git push origin ${{ github.ref_name }}
           
