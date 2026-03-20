@@ -29,17 +29,61 @@ jobs:
           build-args: |
             IMAGE_TAG=${{ github.sha }}
 
-      - name: Update Kustomize Manifest
-        run: |
-          cd k8s/overlays/production
-          # Update the kustomization.yaml image tag to the current Git SHA
-          kustomize edit set image manav23/nodeserver=manav23/nodeserver:${{ github.sha }}
 
-      - name: Commit and Push Changes
+      # - name: Update Kustomize Manifest
+      #   run: |
+      #     cd k8s/overlays/production
+      #     # Update the kustomization.yaml image tag to the current Git SHA
+      #     kustomize edit set image manav23/nodeserver=manav23/nodeserver:${{ github.sha }}
+
+      # - name: Commit and Push Changes
+      #   run: |
+      #     git config --global user.name "github-actions[bot]"
+      #     git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      #     git add k8s/overlays/production/kustomization.yaml
+      #     # [skip ci] prevents the workflow from triggering itself in a loop
+      #     git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
+      #     git push
+
+      # 4. Checkout Deployment Repo (prod branch)
+      - name: Checkout Deployment Repo
+        uses: actions/checkout@v4
+        with:
+          repository: manavmodi/timoni-sample-app
+          ref: prod
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          path: deployment-repo
+
+      # 5. Update image.cue (IMPORTANT PART)
+      - name: Update image.cue
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/production/kustomization.yaml
-          # [skip ci] prevents the workflow from triggering itself in a loop
-          git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
-          git push
+          cd timoni-sample-app
+
+          echo "Updating image.cue..."
+
+          # Update repository
+          sed -i 's|repository: ".*"|repository: "manav23/nodeserver"|' image.cue
+
+          # Update tag
+          sed -i 's|tag: ".*"|tag: "${{ github.sha }}"|' image.cue
+
+          echo "Updated file:"
+          cat image.cue
+
+      # 6. Create Pull Request
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          path: deployment-repo
+          branch: bot/update-image-${{ github.sha }}
+          base: prod
+          commit-message: "chore: update image to ${{ github.sha }}"
+          title: "chore: update image to ${{ github.sha }}"
+          body: |
+            🚀 Automated PR
+
+            Updated image:
+            manav23/nodeserver:${{ github.sha }}
+
+          
