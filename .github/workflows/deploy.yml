@@ -54,8 +54,16 @@ jobs:
           token: ${{ secrets.DEPLOY_REPO_TOKEN }}
           path: deployment-repo
 
+      - name: Debug - show workspace
+        run: |
+          echo "Repository root:"
+          pwd
+          echo "Files in workspace:"
+          ls -la
+          
       # 5. Update image.cue (IMPORTANT PART)
       - name: Update image.cue
+        working-directory: timoni-sample-app
         run: |
           cd timoni-sample-app
 
