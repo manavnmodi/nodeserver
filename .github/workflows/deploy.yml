@@ -74,14 +74,14 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.DEPLOY_REPO_TOKEN }}
-          path: deployment-repo
+          path: timoni-sample-app  
           branch: bot/update-image-${{ github.sha }}
           base: prod
           commit-message: "chore: update image to ${{ github.sha }}"
           title: "chore: update image to ${{ github.sha }}"
           body: |
             🚀 Automated PR
-
+        
             Updated image:
             manav23/nodeserver:${{ github.sha }}
 
