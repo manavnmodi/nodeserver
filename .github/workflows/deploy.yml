@@ -61,9 +61,11 @@ jobs:
         run: |
           echo "Updating image.cue..."
       
-          sed -i 's|repository: ".*"|repository: "manav23/nodeserver"|' image.cue
+          # Always keep latest tag
+          sed -i 's|tag:.*|tag: "latest"|' image.cue
       
-          sed -i "s|tag:[[:space:]]*\"[^\"]*\"|tag: \"${{ github.sha }}\"|" image.cue
+          # Update digest (IMPORTANT)
+          sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" image.cue
       
           echo "Updated file:"
           cat image.cue
