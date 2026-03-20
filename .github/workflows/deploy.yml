@@ -58,8 +58,6 @@ jobs:
       - name: Update image.cue
         working-directory: timoni-sample-app
         run: |
-          cd timoni-sample-app
-
           echo "Updating image.cue..."
 
           # Update repository
