@@ -4,6 +4,15 @@ on:
   push:
     branches: ["prod"]
 
+env:
+  DOCKER_IMAGE_NAME: manav23/nodeserver
+  DOCKER_REGISTRY: docker.io
+  VERSION: latest
+  DOCKERFILE_PATH: ./Dockerfile
+  DEPLOYMENT_REPO: timoni-sample-app
+  DEPLOYMENT_BRANCH: prod
+  IMAGE_CUE_PATH: image.cue
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -11,91 +20,71 @@ jobs:
       contents: write
 
     steps:
-      # 1. Checkout source repo
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Login to DockerHub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3. Build and Push Image
       - name: Build and Push Image
-        id: build   # ✅ REQUIRED for digest
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           no-cache: true
+          file: ${{ env.DOCKERFILE_PATH }}
           tags: |
-            manav23/nodeserver:latest
-            manav23/nodeserver:${{ github.sha }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
 
-
-      # - name: Update Kustomize Manifest
-      #   run: |
-      #     cd k8s/overlays/production
-      #     # Update the kustomization.yaml image tag to the current Git SHA
-      #     kustomize edit set image manav23/nodeserver=manav23/nodeserver:${{ github.sha }}
-
-      # - name: Commit and Push Changes
-      #   run: |
-      #     git config --global user.name "github-actions[bot]"
-      #     git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      #     git add k8s/overlays/production/kustomization.yaml
-      #     # [skip ci] prevents the workflow from triggering itself in a loop
-      #     git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
-      #     git push
-      # 4. Extract Digest 
       - name: Extract Digest
-        run: |
-          echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
+        run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
-      # 5. Debug Digest (optional but recommended)
-      - name: Debug Digest
-        run: |
-          echo "Digest is: $DIGEST"
+      # 🔑 Always needed — exchanges static creds for short-lived token
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.TIMONI_APP_ID }}
+          private-key: ${{ secrets.TIMONI_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ env.DEPLOYMENT_REPO }}
 
-      # 6. Checkout Deployment Repo
+      - name: Get Bot Identity
+        id: bot
+        run: |
+          BOT_NAME="${{ steps.app-token.outputs.app-slug }}[bot]"
+          BOT_ID=$(curl -s \
+            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
+            https://api.github.com/users/${BOT_NAME} | jq -r '.id // "0"')
+          echo "name=${BOT_NAME}" >> $GITHUB_OUTPUT
+          echo "id=${BOT_ID}" >> $GITHUB_OUTPUT
+
       - name: Checkout Deployment Repo
         uses: actions/checkout@v4
         with:
-          repository: manavnmodi/timoni-sample-app
-          ref: ${{ github.ref_name }}
-          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
-          path: timoni-sample-app
+          repository: ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }}
+          ref: ${{ env.DEPLOYMENT_BRANCH }}
+          token: ${{ steps.app-token.outputs.token }}
+          path: deployment-repo
 
-      # 7. Update image.cue
       - name: Update image.cue
-        working-directory: timoni-sample-app
+        working-directory: deployment-repo
         run: |
-          echo "Updating image.cue..."
+          sed -i 's|tag:.*|tag: "${{ env.VERSION }}"|' ${{ env.IMAGE_CUE_PATH }}
+          sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" ${{ env.IMAGE_CUE_PATH }}
+          cat ${{ env.IMAGE_CUE_PATH }}
 
-          echo "Before:"
-          cat image.cue
-
-          # Ensure tag is always latest
-          sed -i 's|tag:.*|tag: "latest"|' image.cue
-
-          # Update digest 
-          sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" image.cue
-
-          echo "After:"
-          cat image.cue
-
-      # 8. Commit and Push
-      - name: Commit and Push Changes
-        working-directory: timoni-sample-app
+      - name: Commit and Push
+        working-directory: deployment-repo
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
-          git add image.cue
-          git diff --cached --quiet && echo "No changes detected" && exit 0
-      
-          git commit -m "chore: update image digest to ${DIGEST}"
-          git push origin ${{ github.ref_name }}
-          
+          git config user.name "${{ steps.bot.outputs.name }}"
+          git config user.email "${{ steps.bot.outputs.id }}+${{ steps.bot.outputs.name }}@users.noreply.github.com"
+          git add ${{ env.IMAGE_CUE_PATH }}
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: update image digest to ${DIGEST} [skip ci]"
+          git push origin ${{ env.DEPLOYMENT_BRANCH }}
