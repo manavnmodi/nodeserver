@@ -44,7 +44,7 @@ jobs:
       - name: Extract Digest
         run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
-      # 🔑 Always needed — exchanges static creds for short-lived token
+      # exchanges static creds for short-lived token
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
