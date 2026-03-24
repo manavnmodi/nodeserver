@@ -16,8 +16,9 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout Code
@@ -35,7 +36,6 @@ jobs:
         with:
           context: .
           push: true
-          no-cache: true
           file: ${{ env.DOCKERFILE_PATH }}
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.VERSION }}
@@ -44,7 +44,6 @@ jobs:
       - name: Extract Digest
         run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
-      # exchanges static creds for short-lived token
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -53,16 +52,6 @@ jobs:
           private-key: ${{ secrets.TIMONI_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ env.DEPLOYMENT_REPO }}
-
-      - name: Get Bot Identity
-        id: bot
-        run: |
-          BOT_NAME="${{ steps.app-token.outputs.app-slug }}[bot]"
-          BOT_ID=$(curl -s \
-            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
-            https://api.github.com/users/${BOT_NAME} | jq -r '.id // "0"')
-          echo "name=${BOT_NAME}" >> $GITHUB_OUTPUT
-          echo "id=${BOT_ID}" >> $GITHUB_OUTPUT
 
       - name: Checkout Deployment Repo
         uses: actions/checkout@v4
@@ -77,14 +66,14 @@ jobs:
         run: |
           sed -i 's|tag:.*|tag: "${{ env.VERSION }}"|' ${{ env.IMAGE_CUE_PATH }}
           sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" ${{ env.IMAGE_CUE_PATH }}
-          cat ${{ env.IMAGE_CUE_PATH }}
-
-      - name: Commit and Push
-        working-directory: deployment-repo
-        run: |
-          git config user.name "${{ steps.bot.outputs.name }}"
-          git config user.email "${{ steps.bot.outputs.id }}+${{ steps.bot.outputs.name }}@users.noreply.github.com"
-          git add ${{ env.IMAGE_CUE_PATH }}
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "chore: update image digest to ${DIGEST}"
-          git push origin ${{ env.DEPLOYMENT_BRANCH }}
+          
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          path: deployment-repo
+          commit-message: "chore: update image digest to ${{ steps.build.outputs.digest }}"
+          branch: bot/image-update-${{ github.sha }}
+          base: prod
+          title: "Auto: Update image digest"
+          body: "Automated image update from CI"
