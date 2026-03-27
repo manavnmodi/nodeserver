@@ -8,6 +8,7 @@ const server = http.createServer((req, res) => {
   res.end(`Hello Inventyv DevOps: ${VERSION}\n`);
 });
 
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
