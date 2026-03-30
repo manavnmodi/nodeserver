@@ -79,20 +79,25 @@ jobs:
 
       # --- PHASE 2: APPROVE THE PR (Using Machine User PAT) ---
       - name: Approve PR as CodeOwner
+        # ONLY run this step if a PR number exists!
+        if: ${{ steps.cpr.outputs.pull-request-number }}
         run: |
           gh pr review ${{ steps.cpr.outputs.pull-request-number }} \
             --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
             --approve \
             --body "Approved by CodeOwner Machine User."
         env:
-          # The PAT acts as the human reviewer
           GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }} 
 
       # --- PHASE 3: MERGE THE PR (Using GitHub App) ---
       - name: Auto-Merge PR and Delete Branch
+        # ONLY run this step if a PR number exists!
+        if: ${{ steps.cpr.outputs.pull-request-number }}
         run: |
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} \
             --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
-            --squash --auto --delete-branch
+            --squash \
+            --auto \
+            --delete-branch
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
