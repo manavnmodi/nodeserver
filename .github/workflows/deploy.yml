@@ -89,10 +89,10 @@ jobs:
           GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }} 
 
       # --- PHASE 3: MERGE THE PR (Using GitHub App) ---
-      - name: Auto-Merge PR
+      - name: Auto-Merge PR and Delete Branch
         run: |
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} \
             --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
-            --squash --auto
+            --squash --auto --delete-branch
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
