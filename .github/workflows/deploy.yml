@@ -92,7 +92,7 @@ jobs:
       - name: Auto-Merge PR
         run: |
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} \
-            --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
-            --squash --auto
+            --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} 
+            
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
