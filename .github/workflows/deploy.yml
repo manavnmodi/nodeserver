@@ -10,7 +10,7 @@ env:
   VERSION: latest
   DOCKERFILE_PATH: ./Dockerfile
   DEPLOYMENT_REPO: timoni-sample-app
-  IMAGE_CUE_PATH: timoni.cue
+  IMAGE_CUE_PATH: image.cue
 
 jobs:
   build-and-deploy:
