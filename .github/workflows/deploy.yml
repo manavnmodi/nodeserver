@@ -42,11 +42,9 @@ jobs:
       - name: Extract Digest
         run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
-      # ---------------------------------------------------------
-      # PHASE 1: CREATE THE PR (Using App 1)
-      # ---------------------------------------------------------
+      # --- PHASE 1: CREATE THE PR (Using GitHub App) ---
       - name: Generate Creator App Token
-        id: creator-token
+        id: app-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.TIMONI_APP_ID }}
@@ -59,7 +57,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }}
           ref: prod
-          token: ${{ steps.creator-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token }}
           path: deployment-repo
 
       - name: Update image.cue
@@ -72,44 +70,29 @@ jobs:
         id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ steps.creator-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token }}
           path: deployment-repo
           commit-message: "chore: update image digest to ${{ steps.build.outputs.digest }}"
           branch: bot/image-update-${{ github.sha }}
           base: prod
           title: "Auto: Update image digest"
-          body: "Automated image update from CI"
 
-      # ---------------------------------------------------------
-      # PHASE 2: APPROVE THE PR (Using App 2)
-      # ---------------------------------------------------------
-      - name: Generate Approver App Token
-        id: approver-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.APPROVER_APP_ID }}
-          private-key: ${{ secrets.APPROVER_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ${{ env.DEPLOYMENT_REPO }}
-
+      # --- PHASE 2: APPROVE THE PR (Using Machine User PAT) ---
       - name: Approve PR as CodeOwner
         run: |
           gh pr review ${{ steps.cpr.outputs.pull-request-number }} \
             --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
             --approve \
-            --body "Approved by CodeOwner Bot."
+            --body "Approved by CodeOwner Machine User."
         env:
-          # The Approver token provides the required review
-          GH_TOKEN: ${{ steps.approver-token.outputs.token }} 
+          # The PAT acts as the human reviewer
+          GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }} 
 
-      # ---------------------------------------------------------
-      # PHASE 3: MERGE THE PR
-      # ---------------------------------------------------------
+      # --- PHASE 3: MERGE THE PR (Using GitHub App) ---
       - name: Auto-Merge PR
         run: |
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} \
             --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
             --squash --auto
         env:
-          # The Creator token finalizes the merge
-          GH_TOKEN: ${{ steps.creator-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
