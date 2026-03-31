@@ -54,7 +54,7 @@ jobs:
           repositories: ${{ env.DEPLOYMENT_REPO }}
  
       - name: Checkout Deployment Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }}
           ref:   ${{ github.ref_name }}  
