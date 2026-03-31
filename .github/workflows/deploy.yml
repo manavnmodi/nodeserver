@@ -10,7 +10,6 @@ env:
   VERSION: latest
   DOCKERFILE_PATH: ./Dockerfile
   DEPLOYMENT_REPO: timoni-sample-app
-  # DEPLOYMENT_BRANCH: prod
   IMAGE_CUE_PATH: image.cue
   REPO_CLONE_PATH: deployment-repo
  
