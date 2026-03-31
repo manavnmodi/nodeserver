@@ -12,6 +12,7 @@ env:
   DEPLOYMENT_REPO: timoni-sample-app
   # DEPLOYMENT_BRANCH: prod
   IMAGE_CUE_PATH: image.cue
+  REPO_CLONE_PATH: deployment-repo
  
 jobs:
   build-and-deploy:
@@ -59,11 +60,11 @@ jobs:
           repository: ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }}
           ref:   ${{ github.ref_name }}  
           token: ${{ steps.app-token.outputs.token }}
-          path:  deployment-repo
+          path:  ${{env.REPO_CLONE_PATH}}
           persist-credentials: false
  
       - name: Update image.cue
-        working-directory: deployment-repo
+        working-directory: ${{env.REPO_CLONE_PATH}}
         run: |
           sed -i 's|tag:.*|tag: "${{ env.VERSION }}"|' ${{ env.IMAGE_CUE_PATH }}
           sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" ${{ env.IMAGE_CUE_PATH }}
@@ -72,7 +73,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ steps.app-token.outputs.token }}
-          path: deployment-repo
+          path: ${{env.REPO_CLONE_PATH}}
           commit-message: "chore: update image digest to ${{ steps.build.outputs.digest }}"
           branch: bot/image-update-${{ github.sha }}
           base: ${{ github.ref_name }}
