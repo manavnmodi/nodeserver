@@ -1,33 +1,35 @@
 name: Build, Push and Update GitOps
-
+ 
 on:
   push:
     branches: ["prod"]
-
+ 
 env:
   DOCKER_IMAGE_NAME: manav23/nodeserver
   DOCKER_REGISTRY: docker.io
   VERSION: latest
   DOCKERFILE_PATH: ./Dockerfile
   DEPLOYMENT_REPO: timoni-sample-app
+  # DEPLOYMENT_BRANCH: prod
   IMAGE_CUE_PATH: image.cue
-
+ 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+ 
     permissions:
       contents: read
-
+ 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
+ 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+ 
       - name: Build and Push Image
         id: build
         uses: docker/build-push-action@v5
@@ -38,12 +40,11 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.VERSION }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
-
+ 
       - name: Extract Digest
         run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
-
-      # --- PHASE 1: CREATE THE PR (Using GitHub App) ---
-      - name: Generate Creator App Token
+ 
+      - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
@@ -51,15 +52,15 @@ jobs:
           private-key: ${{ secrets.TIMONI_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ env.DEPLOYMENT_REPO }}
-
+ 
       - name: Checkout Deployment Repo
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }}
-          ref: prod
+          ref:   ${{ github.ref_name }}  
           token: ${{ steps.app-token.outputs.token }}
-          path: deployment-repo
-
+          path:  deployment-repo
+ 
       - name: Update image.cue
         working-directory: deployment-repo
         run: |
@@ -67,37 +68,12 @@ jobs:
           sed -i "s|digest:[[:space:]]*\"[^\"]*\"|digest: \"${DIGEST}\"|" ${{ env.IMAGE_CUE_PATH }}
           
       - name: Create Pull Request
-        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ steps.app-token.outputs.token }}
           path: deployment-repo
           commit-message: "chore: update image digest to ${{ steps.build.outputs.digest }}"
           branch: bot/image-update-${{ github.sha }}
-          base: prod
+          base: ${{ github.ref_name }}
           title: "Auto: Update image digest"
-
-      # --- PHASE 2: APPROVE THE PR (Using Machine User PAT) ---
-      - name: Approve PR as CodeOwner
-        # ONLY run this step if a PR number exists!
-        if: ${{ steps.cpr.outputs.pull-request-number }}
-        run: |
-          gh pr review ${{ steps.cpr.outputs.pull-request-number }} \
-            --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
-            --approve \
-            --body "Approved by CodeOwner Machine User."
-        env:
-          GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }} 
-
-      # --- PHASE 3: MERGE THE PR (Using GitHub App) ---
-      - name: Auto-Merge PR and Delete Branch
-        # ONLY run this step if a PR number exists!
-        if: ${{ steps.cpr.outputs.pull-request-number }}
-        run: |
-          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} \
-            --repo ${{ github.repository_owner }}/${{ env.DEPLOYMENT_REPO }} \
-            --squash \
-            --auto \
-            --delete-branch
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          body: "Automated image update from CI"
