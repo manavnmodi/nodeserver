@@ -60,6 +60,7 @@ jobs:
           ref:   ${{ github.ref_name }}  
           token: ${{ steps.app-token.outputs.token }}
           path:  deployment-repo
+          persist-credentials: false
  
       - name: Update image.cue
         working-directory: deployment-repo
