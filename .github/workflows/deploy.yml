@@ -39,7 +39,7 @@ jobs:
           file: ${{ env.DOCKERFILE_PATH }}
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.VERSION }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          # ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
  
       - name: Extract Digest
         run: echo "DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
